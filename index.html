@@ -150,6 +150,20 @@
             transform: rotateY(180deg);
         }
 
+        /* Shake animation for wrong match */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0) rotateY(180deg); }
+            20% { transform: translateX(-10px) rotateY(180deg); }
+            40% { transform: translateX(10px) rotateY(180deg); }
+            60% { transform: translateX(-10px) rotateY(180deg); }
+            80% { transform: translateX(10px) rotateY(180deg); }
+        }
+
+        .card-wrapper.wrong .card-inner {
+            animation: shake 0.5s;
+            border: 2px solid #e53e3e;
+        }
+
         .card-front, .card-back {
             position: absolute;
             width: 100%;
@@ -244,6 +258,10 @@
             border-radius: 15px;
             box-shadow: var(--shadow);
             animation: slideDown 0.3s ease;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            align-items: center;
         }
 
         @keyframes slideDown {
@@ -251,22 +269,37 @@
             to { transform: translateY(0); opacity: 1; }
         }
 
-        .game-score {
-            font-size: 1.2rem;
+        .game-stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: #718096;
+            text-transform: uppercase;
             font-weight: 700;
-            color: var(--text-color);
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #2d3748;
         }
 
         .game-btn {
             background-color: #2d3748;
             color: white;
             border: none;
-            padding: 8px 20px;
+            padding: 10px 24px;
             border-radius: 20px;
             cursor: pointer;
             font-weight: 600;
-            margin-left: 15px;
             transition: transform 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         .game-btn:hover { transform: scale(1.05); }
 
@@ -309,6 +342,10 @@
             opacity: 0.5;
             cursor: default;
         }
+        .card-wrapper.matched .game-cover {
+            background: #48bb78; /* Green tint when matched */
+            border-color: #48bb78;
+        }
 
         /* Responsive */
         @media (max-width: 600px) {
@@ -320,8 +357,9 @@
             .container { padding: 0 10px; }
             .container.game-mode { gap: 10px; }
             .container.game-mode .card-word { font-size: 0.8rem; }
-            .game-info { flex-direction: column; gap: 10px; }
-            .game-btn { margin: 0; }
+            .game-info { flex-direction: row; padding: 10px; }
+            .stat-value { font-size: 1.2rem; }
+            .game-btn { padding: 8px 16px; font-size: 0.9rem; }
         }
     </style>
 </head>
@@ -351,10 +389,17 @@
         <button class="filter-btn" onclick="filterCards('family')">Gia đình</button>
     </div>
 
-    <!-- Game Info -->
+    <!-- Game Info with Timer -->
     <div class="game-info" id="gameInfo">
-        <span class="game-score">Cặp đã tìm: <span id="matchesFound">0</span> / <span id="totalPairs">12</span></span>
-        <button class="game-btn" onclick="initGame()"><i class="fas fa-redo"></i> Chơi lại (Đảo bài)</button>
+        <div class="game-stat">
+            <span class="stat-label">Thời gian</span>
+            <span class="stat-value" id="timer">00:00</span>
+        </div>
+        <div class="game-stat">
+            <span class="stat-label">Cặp đã tìm</span>
+            <span class="stat-value"><span id="matchesFound">0</span> / <span id="totalPairs">12</span></span>
+        </div>
+        <button class="game-btn" onclick="initGame()"><i class="fas fa-redo"></i> Chơi lại</button>
     </div>
 
     <div class="container" id="cardContainer">
@@ -363,11 +408,11 @@
 
     <!-- Victory Modal -->
     <div id="victoryModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; flex-direction: column;">
-        <div style="background: white; padding: 40px; border-radius: 20px; text-align: center; animation: popIn 0.5s;">
+        <div style="background: white; padding: 40px; border-radius: 20px; text-align: center; animation: popIn 0.5s; max-width: 90%;">
             <i class="fas fa-trophy" style="font-size: 5rem; color: #f6e05e; margin-bottom: 20px;"></i>
             <h2 style="color: #2d3748; margin: 0;">Hoàn thành!</h2>
-            <p style="color: #718096;">Bạn đã ghi nhớ rất tốt.</p>
-            <button class="game-btn" onclick="closeVictory()" style="font-size: 1.2rem; padding: 10px 30px;">Chơi lại</button>
+            <p style="color: #718096; font-size: 1.2rem; margin: 10px 0;">Thời gian: <span id="finalTime" style="font-weight:bold; color:#2d3748">00:00</span></p>
+            <button class="game-btn" onclick="closeVictory()" style="font-size: 1.2rem; padding: 10px 30px; margin-top: 20px;">Chơi lại</button>
         </div>
     </div>
 
@@ -429,6 +474,11 @@
         let currentFilter = 'all';
         let lastUsedWords = []; // Theo dõi các từ đã dùng
 
+        // Stopwatch Variables
+        let timerInterval;
+        let seconds = 0;
+        let isTimerRunning = false;
+
         // --- GENERAL FUNCTIONS ---
 
         function speak(text, event) {
@@ -452,6 +502,7 @@
             const instruction = document.getElementById('instructionText');
 
             if (mode === 'study') {
+                stopTimer();
                 studyControls.style.display = 'flex';
                 gameInfo.style.display = 'none';
                 container.classList.remove('game-mode');
@@ -464,6 +515,36 @@
                 instruction.innerHTML = 'Tìm cặp: Từ Tiếng Anh - Nghĩa Tiếng Việt';
                 initGame();
             }
+        }
+
+        // --- TIMER FUNCTIONS ---
+        function startTimer() {
+            if (isTimerRunning) return;
+            isTimerRunning = true;
+            seconds = 0;
+            updateTimerDisplay();
+            timerInterval = setInterval(() => {
+                seconds++;
+                updateTimerDisplay();
+            }, 1000);
+        }
+
+        function stopTimer() {
+            isTimerRunning = false;
+            clearInterval(timerInterval);
+        }
+
+        function resetTimer() {
+            stopTimer();
+            seconds = 0;
+            updateTimerDisplay();
+        }
+
+        function updateTimerDisplay() {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            document.getElementById('timer').innerText = 
+                `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
         }
 
         // --- STUDY MODE FUNCTIONS ---
@@ -518,9 +599,10 @@
         let lockBoard = false;
         let firstCard, secondCard;
         let pairsMatched = 0;
-        let totalPairs = 12; // Number of pairs to play
+        let totalPairs = 12;
 
         function initGame() {
+            resetTimer(); // Reset timer when game initializes
             container.innerHTML = '';
             pairsMatched = 0;
             hasFlippedCard = false;
@@ -530,49 +612,45 @@
             let sourceData = currentFilter === 'all' ? vocabData : vocabData.filter(i => i.type === currentFilter);
             
             // --- Anti-repetition Logic ---
-            // Phân loại thành từ Mới (chưa chơi ván trước) và từ Cũ
             let freshItems = sourceData.filter(item => !lastUsedWords.includes(item.en));
             let staleItems = sourceData.filter(item => lastUsedWords.includes(item.en));
 
-            // Trộn ngẫu nhiên từng nhóm
             freshItems.sort(() => 0.5 - Math.random());
             staleItems.sort(() => 0.5 - Math.random());
 
             let selectedItems = [];
             let needed = totalPairs;
 
-            // Ưu tiên lấy từ mới trước
+            // Prioritize fresh items
             let takeFresh = Math.min(needed, freshItems.length);
             selectedItems = selectedItems.concat(freshItems.slice(0, takeFresh));
             needed -= takeFresh;
 
-            // Nếu thiếu thì lấy thêm từ cũ
+            // Fill with stale items if needed
             if (needed > 0) {
                 let takeStale = Math.min(needed, staleItems.length);
                 selectedItems = selectedItems.concat(staleItems.slice(0, takeStale));
             }
 
-            // Cập nhật lại danh sách "đã dùng" cho ván sau
+            // Update used words list
             lastUsedWords = selectedItems.map(item => item.en);
             
-            // Cập nhật hiển thị số lượng
             document.getElementById('totalPairs').innerText = selectedItems.length;
             document.getElementById('matchesFound').innerText = '0';
 
-            // 2. Create Pairs (English Card + Vietnamese Card)
+            // 2. Create Pairs
             let gameCards = [];
             selectedItems.forEach((item, index) => {
                 // English Card
                 gameCards.push({
-                    id: index,
+                    id: index, // Unique Pair ID
                     type: item.type,
                     content: `<div class="card-word">${item.en}</div>`,
-                    isEnglish: true,
-                    rawText: item.en
+                    isEnglish: true
                 });
                 // Vietnamese Card
                 gameCards.push({
-                    id: index,
+                    id: index, // Matching Pair ID
                     type: item.type,
                     content: `<div class="card-icon">${item.icon}</div><div class="card-meaning">${item.vi}</div>`,
                     isEnglish: false
@@ -586,7 +664,7 @@
             gameCards.forEach(card => {
                 const cardEl = document.createElement('div');
                 cardEl.className = `card-wrapper type-${card.type}`;
-                cardEl.dataset.id = card.id;
+                cardEl.dataset.id = card.id; // Store ID in dataset for matching logic
 
                 cardEl.innerHTML = `
                     <div class="card-inner">
@@ -605,8 +683,14 @@
         }
 
         function flipGameCard() {
+            // Start timer on first valid click
+            if (!isTimerRunning && pairsMatched < totalPairs) {
+                startTimer();
+            }
+
             if (lockBoard) return;
-            if (this === firstCard) return; // Clicking same card twice
+            if (this === firstCard) return; // Prevent double clicking same card
+            if (this.classList.contains('matched')) return; // Prevent clicking matched cards
 
             this.classList.add('flipped');
 
@@ -623,6 +707,7 @@
         }
 
         function checkForMatch() {
+            // Check if datasets match
             let isMatch = firstCard.dataset.id === secondCard.dataset.id;
 
             if (isMatch) {
@@ -633,11 +718,10 @@
         }
 
         function disableCards() {
-            // Keep them flipped but remove click listener
             firstCard.removeEventListener('click', flipGameCard);
             secondCard.removeEventListener('click', flipGameCard);
             
-            // Add visual cue
+            // Delay adding matched style for visual clarity
             setTimeout(() => {
                 firstCard.classList.add('matched');
                 secondCard.classList.add('matched');
@@ -649,7 +733,9 @@
 
             let targetPairs = parseInt(document.getElementById('totalPairs').innerText);
             if (pairsMatched === targetPairs) {
+                stopTimer(); // <-- Dừng đồng hồ ngay lập tức khi hoàn thành
                 setTimeout(() => {
+                    document.getElementById('finalTime').innerText = document.getElementById('timer').innerText;
                     document.getElementById('victoryModal').style.display = 'flex';
                 }, 800);
             }
@@ -657,11 +743,18 @@
 
         function unflipCards() {
             lockBoard = true;
+            
+            // Add shake animation for wrong guess
             setTimeout(() => {
-                firstCard.classList.remove('flipped');
-                secondCard.classList.remove('flipped');
+                firstCard.classList.add('wrong');
+                secondCard.classList.add('wrong');
+            }, 400);
+
+            setTimeout(() => {
+                firstCard.classList.remove('flipped', 'wrong');
+                secondCard.classList.remove('flipped', 'wrong');
                 resetBoard();
-            }, 1000); // 1 second delay
+            }, 1200);
         }
 
         function resetBoard() {
