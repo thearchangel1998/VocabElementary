@@ -28,6 +28,10 @@
             --family-color: #48bb78;  /* Green */
             --family-gradient: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
 
+            /* Travel & Feelings Colors (New) */
+            --travel-color: #9b59b6;  /* Purple */
+            --travel-gradient: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+
             --card-bg: #ffffff;
             --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
             
@@ -189,14 +193,17 @@
         .type-housing .card-front { border-bottom: 6px solid var(--housing-color); }
         .type-place .card-front { border-bottom: 6px solid var(--places-color); }
         .type-family .card-front { border-bottom: 6px solid var(--family-color); }
+        .type-travel .card-front { border-bottom: 6px solid var(--travel-color); }
 
         .type-housing .card-tag { background: var(--housing-gradient); }
         .type-place .card-tag { background: var(--places-gradient); }
         .type-family .card-tag { background: var(--family-gradient); }
+        .type-travel .card-tag { background: var(--travel-gradient); }
 
         .type-housing .card-back { background: var(--housing-gradient); }
         .type-place .card-back { background: var(--places-gradient); }
         .type-family .card-back { background: var(--family-gradient); }
+        .type-travel .card-back { background: var(--travel-gradient); }
 
         .card-word {
             font-size: 1.5rem;
@@ -387,6 +394,7 @@
         <button class="filter-btn" onclick="filterCards('housing')">Nhà ở</button>
         <button class="filter-btn" onclick="filterCards('place')">Địa điểm</button>
         <button class="filter-btn" onclick="filterCards('family')">Gia đình</button>
+        <button class="filter-btn" onclick="filterCards('travel')">Du lịch & Cảm xúc</button>
     </div>
 
     <!-- Game Info with Timer -->
@@ -465,7 +473,20 @@
             { en: "Repair", vi: "Sửa chữa", type: "family", icon: "🛠️" },
             { en: "Wash the dishes", vi: "Rửa bát", type: "family", icon: "🍽️" },
             { en: "Lazy", vi: "Lười biếng", type: "family", icon: "😴" },
-            { en: "Take dog for walk", vi: "Dắt chó đi dạo", type: "family", icon: "🐕" }
+            { en: "Take dog for walk", vi: "Dắt chó đi dạo", type: "family", icon: "🐕" },
+
+            // --- Travel & Feelings (New) ---
+            { en: "Fantastic", vi: "= Great (Tuyệt vời)", type: "travel", icon: "🤩" },
+            { en: "Whole", vi: "= Complete (Toàn bộ)", type: "travel", icon: "🌕" },
+            { en: "Worried", vi: "≠ Relaxed (Lo lắng)", type: "travel", icon: "😟" },
+            { en: "Fly", vi: "= Travel by plane (Bay)", type: "travel", icon: "✈️" },
+            { en: "Trip", vi: "= Tour / Journey (Chuyến đi)", type: "travel", icon: "🎒" },
+            { en: "Wonderful", vi: "≠ Terrible, Bad (Tuyệt diệu)", type: "travel", icon: "✨" },
+            { en: "Castle", vi: "= Palace (Lâu đài)", type: "travel", icon: "🏰" },
+            { en: "Sightseeing", vi: "= Touring (Ngắm cảnh)", type: "travel", icon: "📸" },
+            { en: "Chat", vi: "= Talk (Trò chuyện)", type: "travel", icon: "💬" },
+            { en: "Cycling", vi: "= Riding a bike (Đạp xe)", type: "travel", icon: "🚲" },
+            { en: "Relaxing", vi: "≠ Stressful, Tiring (Thư giãn)", type: "travel", icon: "💆" }
         ];
 
         const container = document.getElementById('cardContainer');
@@ -478,6 +499,7 @@
         let timerInterval;
         let seconds = 0;
         let isTimerRunning = false;
+        let targetPairs = 12; // Adjusted dynamically
 
         // --- GENERAL FUNCTIONS ---
 
@@ -561,7 +583,11 @@
                 const cardWrapper = document.createElement('div');
                 cardWrapper.className = `card-wrapper type-${item.type}`;
                 
-                let typeName = item.type === 'housing' ? 'Housing' : (item.type === 'family' ? 'Family Home' : 'Place');
+                let typeName;
+                if (item.type === 'housing') typeName = 'Housing';
+                else if (item.type === 'family') typeName = 'Family Home';
+                else if (item.type === 'travel') typeName = 'Travel & Feelings';
+                else typeName = 'Place';
                 
                 cardWrapper.innerHTML = `
                     <div class="card-inner">
@@ -599,7 +625,7 @@
         let lockBoard = false;
         let firstCard, secondCard;
         let pairsMatched = 0;
-        let totalPairs = 12;
+        let defaultPairs = 12;
 
         function initGame() {
             resetTimer(); // Reset timer when game initializes
@@ -611,6 +637,9 @@
             // 1. Select vocabulary based on filter
             let sourceData = currentFilter === 'all' ? vocabData : vocabData.filter(i => i.type === currentFilter);
             
+            // Adjust target pairs if source is smaller than default
+            targetPairs = Math.min(defaultPairs, sourceData.length);
+            
             // --- Anti-repetition Logic ---
             let freshItems = sourceData.filter(item => !lastUsedWords.includes(item.en));
             let staleItems = sourceData.filter(item => lastUsedWords.includes(item.en));
@@ -619,7 +648,7 @@
             staleItems.sort(() => 0.5 - Math.random());
 
             let selectedItems = [];
-            let needed = totalPairs;
+            let needed = targetPairs;
 
             // Prioritize fresh items
             let takeFresh = Math.min(needed, freshItems.length);
@@ -684,7 +713,7 @@
 
         function flipGameCard() {
             // Start timer on first valid click
-            if (!isTimerRunning && pairsMatched < totalPairs) {
+            if (!isTimerRunning && pairsMatched < targetPairs) {
                 startTimer();
             }
 
@@ -732,7 +761,6 @@
             pairsMatched++;
             document.getElementById('matchesFound').innerText = pairsMatched;
 
-            let targetPairs = parseInt(document.getElementById('totalPairs').innerText);
             if (pairsMatched === targetPairs) {
                 stopTimer(); // <-- Dừng đồng hồ ngay lập tức khi hoàn thành
                 setTimeout(() => {
